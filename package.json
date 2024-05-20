@@ -1,6 +1,6 @@
 {
   "name": "eslint-plugin-italia-react-commons",
-  "version": "0.0.5",
+  "version": "0.0.10",
   "description": "Custom ESLint plugin to validate form configurations against JSON schema",
   "main": "plugins/validator/index.js",
   "scripts": {
@@ -15,7 +15,8 @@
   "author": "Stefano Gargiulo",
   "license": "ISC",
   "dependencies": {
-    "ajv": "^8.6.3"
+    "ajv": "^8.6.3",
+    "debug": "^4.3.4"
   },
   "devDependencies": {
     "eslint": "^7.32.0"
