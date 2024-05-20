@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "type": { "type": "string", "enum": ["text", "select", "number", "date", "checkbox", "radio", "textarea"] },
+                "label": { "type": "string" },
+                "required": { "type": "boolean" },
+                "options": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              },
+              "required": ["name", "type", "label", "required"]
+            }
+          }
+        },
+        "required": ["title", "fields"]
+      }
+    }
+  },
+  "required": ["steps"]
+}
