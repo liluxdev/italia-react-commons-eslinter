@@ -17,15 +17,25 @@ const formSchemaValidator = {
   create(context) {
     return {
       VariableDeclarator(node) {
+        // Verifica che l'oggetto `form` contenga la proprietà `steps`
         if (node.id.name === 'form' && node.init) {
-          const formConfig = node.init;
-          const isValid = validate(formConfig);
-          if (!isValid) {
-            validate.errors.forEach(error => {
-              context.report({
-                node,
-                message: `Validation error: ${error.message}`
+          // Converti l'oggetto AST in un oggetto JS
+          const formConfig = context.getSourceCode().getText(node.init);
+          try {
+            const parsedConfig = eval('(' + formConfig + ')');
+            const isValid = validate(parsedConfig);
+            if (!isValid) {
+              validate.errors.forEach(error => {
+                context.report({
+                  node,
+                  message: `Validation error: ${error.message}`
+                });
               });
+            }
+          } catch (e) {
+            context.report({
+              node,
+              message: `Parsing error: ${e.message}`
             });
           }
         }
