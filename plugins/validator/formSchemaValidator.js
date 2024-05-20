@@ -1,43 +1,80 @@
-const Ajv = require('ajv');
-const schema = require('./formSchema.json');
-
-const ajv = new Ajv();
-const validate = ajv.compile(schema);
-
 const formSchemaValidator = {
   meta: {
     type: 'problem',
     docs: {
-      description: 'validate form configuration against JSON schema',
+      description: 'validate form configuration and step objects',
       category: 'Possible Errors',
       recommended: true
     },
     schema: [] // no options
   },
   create(context) {
+    function validateStepObject(stepNode, node) {
+      const stepProperties = stepNode.properties.map(p => p.key.name);
+
+      const requiredProperties = ['stepperCallout', 'name', 'fields'];
+      requiredProperties.forEach(prop => {
+        if (!stepProperties.includes(prop)) {
+          context.report({
+            node,
+            message: `Step object is missing the '${prop}' property`
+          });
+        }
+      });
+
+      const fieldsNode = stepNode.properties.find(property => property.key.name === 'fields');
+      if (fieldsNode && fieldsNode.value.type !== 'ArrayExpression') {
+        context.report({
+          node: fieldsNode,
+          message: `'fields' should be an array`
+        });
+      }
+    }
+
     return {
       VariableDeclarator(node) {
-        // Verifica che l'oggetto `form` contenga la proprietà `steps`
         if (node.id.name === 'form' && node.init) {
-          // Converti l'oggetto AST in un oggetto JS
-          const formConfig = context.getSourceCode().getText(node.init);
-          try {
-            const parsedConfig = eval('(' + formConfig + ')');
-            const isValid = validate(parsedConfig);
-            if (!isValid) {
-              validate.errors.forEach(error => {
-                context.report({
-                  node,
-                  message: `Validation error: ${error.message}`
-                });
-              });
-            }
-          } catch (e) {
+          const formConfig = node.init.properties;
+          
+          // Check if `steps` property exists
+          const hasSteps = formConfig.some(property => property.key.name === 'steps');
+          if (!hasSteps) {
             context.report({
               node,
-              message: `Parsing error: ${e.message}`
+              message: `The form object is missing the 'steps' property`
             });
+            return;
           }
+
+          // Validate `steps` property
+          const stepsNode = formConfig.find(property => property.key.name === 'steps');
+          const steps = stepsNode.value.elements;
+
+          if (!Array.isArray(steps)) {
+            context.report({
+              node: stepsNode,
+              message: `'steps' should be an array`
+            });
+            return;
+          }
+
+          // Validate each step in `steps`
+          steps.forEach((step, index) => {
+            if (!step.properties) {
+              context.report({
+                node: step,
+                message: `Step ${index + 1} is not a valid object`
+              });
+              return;
+            }
+            validateStepObject(step, step);
+          });
+        }
+      },
+      ReturnStatement(node) {
+        if (node.argument && node.argument.type === 'ObjectExpression') {
+          const stepConfig = node.argument.properties;
+          validateStepObject({ properties: stepConfig }, node);
         }
       }
     };
