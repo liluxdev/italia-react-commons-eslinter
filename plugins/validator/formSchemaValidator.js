@@ -109,7 +109,7 @@ const formSchemaValidator = {
       if (!allowedProperty) {
         context.report({
           node,
-          message: `Form object has an invalid property '${propertyPath}'`
+          message: `Form object has an invalid nested property '${propertyPath}'`
         });
         return false;
       }
@@ -187,12 +187,12 @@ const formSchemaValidator = {
         if (!propName) {
           context.report({
             node,
-            message: `Step object has an invalid property '${prop}'`
+            message: `Step object has an invalid property '${prop}' allowed properties are ${allowedStepProperties.join(', ')}`
           });
         } else if (propTypes && !validatePropertyType(stepNode.properties.find(p => p.key.name === propName), propTypes)) {
           context.report({
             node,
-            message: `Step object property '${propName}' has an invalid type`
+            message: `Step object property '${propName}' has an invalid type , current type is ${stepNode.properties.find(p => p.key.name === propName)?.value?.type} allowed types are ${propTypes.split(',').join(', ')}`
           });
         }
       });
@@ -302,7 +302,7 @@ const formSchemaValidator = {
         if (!validateNestedProperties(propertyNode, formConfig, propPath)) {
           context.report({
             node,
-            message: `Form object has an invalid property '${prop}'`
+            message: `Form object has an invalid property '${prop}' allowed properties are ${allowedFormProperties.join(', ')}`
           });
         }
       });
