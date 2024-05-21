@@ -127,7 +127,7 @@ const formSchemaValidator = {
       }
 
       if (expectedType === 'object') {
-        node.properties.forEach(subNode => {
+        node?.properties?.forEach(subNode => {
           const subPath = [...path, subNode.key.name];
           validateNestedProperties(subNode, properties, subPath);
         });
@@ -151,7 +151,7 @@ const formSchemaValidator = {
         } else if (propTypes && !validatePropertyType(fieldNode.properties.find(p => p.key.name === propName), propTypes)) {
           context.report({
             node,
-            message: `Field object property '${propName}' has an invalid type`
+            message: `Field object property '${propName}' has an invalid type, allowed are ${propTypes.split(',').join(', ')}`
           });
         }
       });
