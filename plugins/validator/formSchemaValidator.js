@@ -19,7 +19,7 @@ const formSchemaValidator = {
       'options.skipFinalRecap:boolean',
       'serverAPI:object',
       'serverAPI.formFinalRecap:string',
-      'serverAPI.method:string["GET","POST","Liferay.invoke","DELETE","PUT","PATCH"]',
+      'serverAPI.method:string',
       'serverAPI.url:string',
       'serverAPI.additionalParams:object',
       'serverAPI.additionalParams.routeExtraParams:array',
@@ -46,13 +46,45 @@ const formSchemaValidator = {
       'visibleIf:function,arrowFunction'
     ];
 
+    const allowedFieldProperties = [
+      'id:string',
+      'serverId:string',
+      'type:string,arrowFunction',
+      'label:string',
+      'placeholder:string',
+      'required:boolean',
+      'typeValidation:string',
+      'typeValidationMsg:string',
+      'min:number',
+      'max:number',
+      'inlineStyle:object',
+      'className:string',
+      'gridTemplateColumns:string',
+      'rowGap:string',
+      'columnGap:string',
+      'defaultValue:any',
+      'prefilled:boolean',
+      'disabled:boolean',
+      'shortLabel:string',
+      'dynamicLabel:boolean',
+      'label2Class:string',
+      'label2:string',
+      'onChange:function,arrowFunction',
+      'options:array',
+      'wrapInCard:boolean',
+      'cardClassName:string',
+      'fields:array'
+    ];
+
     const propertyTypes = {
       'string': ['Literal'],
       'boolean': ['Literal'],
+      'number': ['Literal'],
       'array': ['ArrayExpression'],
       'object': ['ObjectExpression'],
       'function': ['FunctionExpression'],
-      'arrowFunction': ['ArrowFunctionExpression']
+      'arrowFunction': ['ArrowFunctionExpression'],
+      'any': ['Literal', 'ArrayExpression', 'ObjectExpression', 'FunctionExpression', 'ArrowFunctionExpression']
     };
 
     function validatePropertyType(property, expectedTypes, validValues = []) {
@@ -104,6 +136,39 @@ const formSchemaValidator = {
       return true;
     }
 
+    function validateFieldObject(fieldNode, node) {
+      const fieldProperties = fieldNode.properties.map(p => p.key.name);
+      console.log("Field properties:", fieldProperties);
+      debug("Field properties:", fieldProperties);
+
+      fieldProperties.forEach(prop => {
+        const [propName, propTypes] = allowedFieldProperties.find(p => p.startsWith(prop))?.split(':') || [];
+        if (!propName) {
+          context.report({
+            node,
+            message: `Field object has an invalid property '${prop}'`
+          });
+        } else if (propTypes && !validatePropertyType(fieldNode.properties.find(p => p.key.name === propName), propTypes)) {
+          context.report({
+            node,
+            message: `Field object property '${propName}' has an invalid type`
+          });
+        }
+      });
+
+      const nestedFieldsNode = fieldNode.properties.find(property => property.key.name === 'fields');
+      if (nestedFieldsNode) {
+        if (nestedFieldsNode.value.type !== 'ArrayExpression') {
+          context.report({
+            node: nestedFieldsNode,
+            message: `'fields' should be an array`
+          });
+        } else {
+          nestedFieldsNode.value.elements.forEach(element => validateFieldObject(element, nestedFieldsNode));
+        }
+      }
+    }
+
     function validateStepObject(stepNode, node) {
       console.log("Validating step object:", stepNode);
       debug("Validating step object:", stepNode);
@@ -133,11 +198,15 @@ const formSchemaValidator = {
       });
 
       const fieldsNode = stepNode.properties.find(property => property.key.name === 'fields');
-      if (fieldsNode && fieldsNode.value.type !== 'ArrayExpression') {
-        context.report({
-          node: fieldsNode,
-          message: `'fields' should be an array`
-        });
+      if (fieldsNode) {
+        if (fieldsNode.value.type !== 'ArrayExpression') {
+          context.report({
+            node: fieldsNode,
+            message: `'fields' should be an array`
+          });
+        } else {
+          fieldsNode.value.elements.forEach(element => validateFieldObject(element, fieldsNode));
+        }
       }
     }
 
@@ -291,4 +360,4 @@ const formSchemaValidator = {
   }
 };
 
-module.exports = formSchema
+module.exports = formSchemaValidator;
