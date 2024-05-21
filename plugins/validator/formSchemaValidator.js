@@ -34,6 +34,7 @@ const formSchemaValidator = {
         'stepperCalloutHideOthersOnHover',
         'required',
         'message',
+        'scrollOnTop',
         'fields',
         'preflights',
         'visibleIf'
