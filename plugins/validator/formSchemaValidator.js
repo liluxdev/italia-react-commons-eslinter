@@ -11,6 +11,99 @@ const formSchemaValidator = {
     schema: [] // no options
   },
   create(context) {
+    const allowedFormProperties = [
+      'callbackUrl:string',
+      'options:object',
+      'options.recap:boolean',
+      'options.noStampa:boolean',
+      'options.skipFinalRecap:boolean',
+      'serverAPI:object',
+      'serverAPI.formFinalRecap:string',
+      'serverAPI.method:string["GET","POST","Liferay.invoke","DELETE","PUT","PATCH"]',
+      'serverAPI.url:string',
+      'serverAPI.additionalParams:object',
+      'serverAPI.additionalParams.routeExtraParams:array',
+      'serverAPI.additionalParams.liferayUserId:string',
+      'serverAPI.defaultBody:object',
+      'title:string',
+      'persistence:string["void","localStorage","sessionStorage"]',
+      'callback:function,arrowFunction',
+      'steps:array'
+    ];
+
+    const allowedStepProperties = [
+      'id:string',
+      'name:string',
+      'stepperCallout:boolean',
+      'stepperCalloutOnlyOnHover:boolean',
+      'stepperCalloutHideOthers:boolean',
+      'stepperCalloutHideOthersOnHover:boolean',
+      'required:boolean',
+      'message:string',
+      'scrollOnTop:boolean',
+      'fields:array',
+      'preflights:function,arrowFunction',
+      'visibleIf:function,arrowFunction'
+    ];
+
+    const propertyTypes = {
+      'string': ['Literal'],
+      'boolean': ['Literal'],
+      'array': ['ArrayExpression'],
+      'object': ['ObjectExpression'],
+      'function': ['FunctionExpression'],
+      'arrowFunction': ['ArrowFunctionExpression']
+    };
+
+    function validatePropertyType(property, expectedTypes, validValues = []) {
+      const propertyType = property.value.type;
+      const validTypes = expectedTypes.split(',').map(type => propertyTypes[type.trim()]).flat();
+      const isValidType = validTypes.includes(propertyType);
+
+      if (!isValidType) {
+        return false;
+      }
+
+      if (validValues.length > 0 && propertyType === 'Literal' && !validValues.includes(property.value.value)) {
+        return false;
+      }
+
+      return true;
+    }
+
+    function validateNestedProperties(node, properties, path) {
+      const propertyPath = path.join('.');
+      const allowedProperty = allowedFormProperties.find(prop => prop.startsWith(propertyPath));
+      if (!allowedProperty) {
+        context.report({
+          node,
+          message: `Form object has an invalid property '${propertyPath}'`
+        });
+        return false;
+      }
+
+      const [_, expectedTypeWithValues] = allowedProperty.split(':');
+      const [expectedType, values] = expectedTypeWithValues.split('[');
+      const validValues = values ? values.replace(']', '').split(',') : [];
+
+      if (!validatePropertyType(node, expectedType, validValues)) {
+        context.report({
+          node,
+          message: `Property '${propertyPath}' has an invalid type or value`
+        });
+        return false;
+      }
+
+      if (expectedType === 'object') {
+        node.properties.forEach(subNode => {
+          const subPath = [...path, subNode.key.name];
+          validateNestedProperties(subNode, properties, subPath);
+        });
+      }
+
+      return true;
+    }
+
     function validateStepObject(stepNode, node) {
       console.log("Validating step object:", stepNode);
       debug("Validating step object:", stepNode);
@@ -24,36 +117,17 @@ const formSchemaValidator = {
       console.log("Step properties:", stepProperties);
       debug("Step properties:", stepProperties);
 
-      const requiredStepProperties = [];
-      const allowedStepProperties = [
-        'id',
-        'name',
-        'stepperCallout',
-        'stepperCalloutOnlyOnHover',
-        'stepperCalloutHideOthers',
-        'stepperCalloutHideOthersOnHover',
-        'required',
-        'message',
-        'scrollOnTop',
-        'fields',
-        'preflights',
-        'visibleIf'
-      ];
-
-      requiredStepProperties.forEach(prop => {
-        if (!stepProperties.includes(prop)) {
-          context.report({
-            node,
-            message: `Step object is missing the '${prop}' property`
-          });
-        }
-      });
-
       stepProperties.forEach(prop => {
-        if (!allowedStepProperties.includes(prop)) {
+        const [propName, propTypes] = allowedStepProperties.find(p => p.startsWith(prop))?.split(':') || [];
+        if (!propName) {
           context.report({
             node,
             message: `Step object has an invalid property '${prop}'`
+          });
+        } else if (propTypes && !validatePropertyType(stepNode.properties.find(p => p.key.name === propName), propTypes)) {
+          context.report({
+            node,
+            message: `Step object property '${propName}' has an invalid type`
           });
         }
       });
@@ -143,29 +217,6 @@ const formSchemaValidator = {
       debug("Form properties:", formProperties);
 
       const requiredFormProperties = ['steps'];
-      const allowedFormProperties = [
-        'callbackUrl',
-        'options',
-        'recap',
-        'noStampa',
-        'skipFinalRecap',
-        'serverAPI',
-        'formFinalRecap',
-        'method',
-        'url',
-        'additionalParams',
-        'routeExtraParams',
-        'liferayUserId',
-        'defaultBody',
-        'title',
-        'persistence',
-        'callback',
-        'steps',
-        'stepperCallout',
-        'name',
-        'fields',
-        undefined
-      ];
 
       requiredFormProperties.forEach(prop => {
         if (!formProperties.includes(prop)) {
@@ -177,7 +228,9 @@ const formSchemaValidator = {
       });
 
       formProperties.forEach(prop => {
-        if (!allowedFormProperties.includes(prop)) {
+        const propPath = [prop];
+        const propertyNode = formConfig.find(p => p.key.name === prop);
+        if (!validateNestedProperties(propertyNode, formConfig, propPath)) {
           context.report({
             node,
             message: `Form object has an invalid property '${prop}'`
@@ -227,29 +280,15 @@ const formSchemaValidator = {
                            node.parent.parent.parent && node.parent.parent.parent.type === 'ExportNamedDeclaration';
       
         if (isExported) {
-          if (node.body && node.body.type === 'ObjectExpression') {
-            console.log("Found object expression in arrow function:", node.body);
-            debug("Found object expression in arrow function:", node.body);
-            validateStepObject(node.body, node);
-
-            
+          if (node.body && node.body.type === 'ArrayExpression') {
+            console.log("Found array expression in arrow function:", node.body);
+            debug("Found array expression in arrow function:", node.body);
+            node.body.elements.forEach(elm => validateStepObject(elm, node));
           }
         }
-      },
-      
-     /*  FunctionDeclaration(node) {
-        console.log("Checking function declaration:", node);
-        debug("Checking function declaration:", node);
-
-        const returnNode = node.body.body.find(statement => statement.type === 'ReturnStatement');
-        if (returnNode && returnNode.argument.type === 'ObjectExpression') {
-          console.log("Found object expression in function declaration:", returnNode.argument);
-          debug("Found object expression in function declaration:", returnNode.argument);
-          validateFormObject(returnNode.argument.properties, returnNode);
-        }
-      } */
+      }
     };
   }
 };
 
-module.exports = formSchemaValidator;
+module.exports = formSchema
