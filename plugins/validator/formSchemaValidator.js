@@ -121,7 +121,7 @@ const formSchemaValidator = {
       if (!validatePropertyType(node, expectedType, validValues)) {
         context.report({
           node,
-          message: `Property '${propertyPath}' has an invalid type or value`
+          message: `Property '${propertyPath}' has an invalid type or value for '${expectedType}' type, allowed values are ${validValues.join(', ')}`
         });
         return false;
       }
@@ -151,7 +151,7 @@ const formSchemaValidator = {
         } else if (propTypes && !validatePropertyType(fieldNode.properties.find(p => p.key.name === propName), propTypes)) {
           context.report({
             node,
-            message: `Field object property '${propName}' has an invalid type, allowed are ${propTypes.split(',').join(', ')}`
+            message: `Field object property '${propName}' has an invalid type, current type is ${fieldNode.properties.find(p => p.key.name === propName)?.value?.type} allowed types are ${propTypes.split(',').join(', ')}`
           });
         }
       });
