@@ -299,12 +299,7 @@ const formSchemaValidator = {
       formProperties.forEach(prop => {
         const propPath = [prop];
         const propertyNode = formConfig.find(p => p.key.name === prop);
-        if (!validateNestedProperties(propertyNode, formConfig, propPath)) {
-          context.report({
-            node,
-            message: `Form object has an invalid property '${prop}' allowed properties are ${allowedFormProperties.join(', ')}`
-          });
-        }
+        validateNestedProperties(propertyNode, formConfig, propPath);
       });
 
       const stepsNode = formConfig.find(property => property.key?.name === 'steps');
